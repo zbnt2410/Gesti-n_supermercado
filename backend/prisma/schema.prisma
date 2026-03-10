@@ -1,0 +1,271 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Turno {
+  id               Int             @id @default(autoincrement())
+  nombre           String          @unique @db.VarChar(50)
+  horaInicio       DateTime        @map("hora_inicio") @db.Timestamp(6)
+  horaFin          DateTime        @map("hora_fin") @db.Timestamp(6)
+  createdAt        DateTime?       @default(now()) @map("created_at") @db.Timestamp(6)
+  cajaInicial      CajaInicial[]
+  envios           Envio[]
+  fiados           Fiado[]
+  pagosProveedores PagoProveedor[]
+  transferencias   Transferencia[]
+
+  @@map("turnos")
+}
+
+model CajaInicial {
+  id              Int       @id @default(autoincrement())
+  fecha           DateTime  @db.Date
+  turnoId         Int?      @map("turno_id")
+  billetes20      Int?      @default(0) @map("billetes_20")
+  billetes10      Int?      @default(0) @map("billetes_10")
+  billetes5       Int?      @default(0) @map("billetes_5")
+  monedas1        Int?      @default(0) @map("monedas_1")
+  monedas050      Int?      @default(0) @map("monedas_050")
+  monedas025      Int?      @default(0) @map("monedas_025")
+  monedas010      Int?      @default(0) @map("monedas_010")
+  monedas005      Int?      @default(0) @map("monedas_005")
+  monedas001      Int?      @default(0) @map("monedas_001")
+  total_calculado Decimal?  @default(dbgenerated("((((((((((billetes_20 * 20) + (billetes_10 * 10)) + (billetes_5 * 5)) + (monedas_1 * 1)))::numeric + ((monedas_050)::numeric * 0.50)) + ((monedas_025)::numeric * 0.25)) + ((monedas_010)::numeric * 0.10)) + ((monedas_005)::numeric * 0.05)) + ((monedas_001)::numeric * 0.01))")) @db.Decimal(10, 2)
+  usuarioRegistro String?   @map("usuario_registro") @db.VarChar(100)
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  usuario_id      Int?
+  turno           Turno?    @relation(fields: [turnoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios        usuarios? @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([fecha, turnoId], map: "idx_caja_inicial_fecha_turno")
+  @@index([usuario_id], map: "idx_caja_inicial_usuario")
+  @@map("caja_inicial")
+}
+
+model Envio {
+  id          Int       @id @default(autoincrement())
+  fecha       DateTime  @db.Date
+  hora        DateTime  @db.Time(6)
+  descripcion String
+  monto       Decimal   @db.Decimal(10, 2)
+  turnoId     Int?      @map("turno_id")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  usuario_id  Int?
+  turno       Turno?    @relation(fields: [turnoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios    usuarios? @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([fecha], map: "idx_envios_fecha")
+  @@index([usuario_id], map: "idx_envios_usuario")
+  @@map("envios")
+}
+
+model Transferencia {
+  id          Int       @id @default(autoincrement())
+  fecha       DateTime  @db.Date
+  descripcion String
+  monto       Decimal   @db.Decimal(10, 2)
+  turnoId     Int?      @map("turno_id")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  usuario_id  Int?
+  turno       Turno?    @relation(fields: [turnoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuarios    usuarios? @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([fecha], map: "idx_transferencias_fecha")
+  @@index([usuario_id], map: "idx_transferencias_usuario")
+  @@map("transferencias")
+}
+
+model Fiado {
+  id                 Int       @id @default(autoincrement())
+  fecha              DateTime  @db.Date
+  descripcion        String
+  monto              Decimal   @db.Decimal(10, 2)
+  nombrePersona      String    @map("nombre_persona") @db.VarChar(200)
+  tipoPersona        String?   @map("tipo_persona") @db.VarChar(50)
+  turnoId            Int?      @map("turno_id")
+  pagado             Boolean?  @default(false)
+  fechaPago          DateTime? @map("fecha_pago") @db.Date
+  createdAt          DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  registrado_por_id  Int?
+  cubierto_por_abono Boolean?  @default(false)
+  abono_id           Int?
+  monto_abonado      Decimal   @default(0) @db.Decimal(10, 2)
+  abonos             abonos?   @relation(fields: [abono_id], references: [id], onUpdate: NoAction)
+  usuarios           usuarios? @relation(fields: [registrado_por_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  turno              Turno?    @relation(fields: [turnoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([fecha], map: "idx_fiados_fecha")
+  @@index([pagado], map: "idx_fiados_pagado")
+  @@index([abono_id], map: "idx_fiados_abono")
+  @@index([nombrePersona], map: "idx_fiados_nombre_persona")
+  @@map("fiados")
+}
+
+model Proveedor {
+  id               Int                  @id @default(autoincrement())
+  nombre           String               @unique @db.VarChar(200)
+  contacto         String?              @db.VarChar(100)
+  telefono         String?              @db.VarChar(20)
+  activo           Boolean?             @default(true)
+  createdAt        DateTime?            @default(now()) @map("created_at") @db.Timestamp(6)
+  diasPedido       DiaPedidoProveedor[]
+  facturas         facturas[]
+  pagosProveedores PagoProveedor[]
+  pedidos          Pedido[]
+
+  @@map("proveedores")
+}
+
+model PagoProveedor {
+  id          Int        @id @default(autoincrement())
+  fecha       DateTime   @db.Date
+  hora        DateTime   @db.Time(6)
+  proveedorId Int?       @map("proveedor_id")
+  monto       Decimal    @db.Decimal(10, 2)
+  tipoPago    String?    @map("tipo_pago") @db.VarChar(50)
+  turnoId     Int?       @map("turno_id")
+  notas       String?
+  createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamp(6)
+  proveedor   Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  turno       Turno?     @relation(fields: [turnoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([fecha], map: "idx_pagos_proveedores_fecha")
+  @@map("pagos_proveedores")
+}
+
+model EfectivoProveedor {
+  id             Int       @id @default(autoincrement())
+  fecha          DateTime  @unique @db.Date
+  montoInicial   Decimal   @map("monto_inicial") @db.Decimal(10, 2)
+  montoUtilizado Decimal?  @default(0) @map("monto_utilizado") @db.Decimal(10, 2)
+  monto_restante Decimal?  @default(dbgenerated("(monto_inicial - monto_utilizado)")) @db.Decimal(10, 2)
+  notas          String?
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("efectivo_proveedores")
+}
+
+model DiaPedidoProveedor {
+  id          Int        @id @default(autoincrement())
+  proveedorId Int?       @map("proveedor_id")
+  diaSemana   Int?       @map("dia_semana")
+  activo      Boolean?   @default(true)
+  createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamp(6)
+  proveedor   Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([proveedorId, diaSemana])
+  @@map("dias_pedido_proveedores")
+}
+
+model Pedido {
+  id                 Int        @id @default(autoincrement())
+  fecha              DateTime   @db.Date
+  proveedorId        Int?       @map("proveedor_id")
+  llego              Boolean?   @default(false)
+  fechaLlegada       DateTime?  @map("fecha_llegada") @db.Date
+  montoFactura       Decimal?   @map("monto_factura") @db.Decimal(10, 2)
+  descuento          Decimal?   @default(0) @db.Decimal(10, 2)
+  montoFinal         Decimal?   @map("monto_final") @db.Decimal(10, 2)
+  productosCaducados String?    @map("productos_caducados")
+  notas              String?
+  createdAt          DateTime?  @default(now()) @map("created_at") @db.Timestamp(6)
+  pagado             Boolean?   @default(false)
+  fechaPago          DateTime?  @map("fecha_pago") @db.Date
+  pagoId             Int?       @map("pago_id")
+  facturas           facturas[]
+  proveedor          Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([fecha], map: "idx_pedidos_fecha")
+  @@index([proveedorId], map: "idx_pedidos_proveedor")
+  @@map("pedidos")
+}
+
+model ProductoMercado {
+  id               Int       @id @default(autoincrement())
+  fecha            DateTime  @db.Date
+  nombre           String    @db.VarChar(200)
+  costo            Decimal   @db.Decimal(10, 2)
+  tipoVenta        String?   @map("tipo_venta") @db.VarChar(50)
+  cantidad         Decimal   @db.Decimal(10, 2)
+  cantidadPorDolar Decimal?  @map("cantidad_por_dolar") @db.Decimal(10, 4)
+  rentabilidad     Decimal?  @map("rentabilidad") @db.Decimal(10, 4)
+  precioLibra      Decimal?  @map("precio_libra") @db.Decimal(10, 4)
+  activo           Boolean?  @default(true)
+  vendido          Boolean?  @default(false)
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  costoUnitario    Decimal?  @default(dbgenerated("(costo / cantidad)")) @map("costo_unitario") @db.Decimal(10, 4)
+  ventaPorUnidad   Decimal?  @default(dbgenerated("((costo / cantidad) * 1.50)")) @map("venta_por_unidad") @db.Decimal(10, 4)
+
+  @@map("productos_mercado")
+}
+
+model usuarios {
+  id                                         Int             @id @default(autoincrement())
+  nombre                                     String          @db.VarChar(100)
+  email                                      String          @unique @db.VarChar(150)
+  password                                   String          @db.VarChar(255)
+  rol                                        String?         @default("cajero") @db.VarChar(50)
+  activo                                     Boolean?        @default(true)
+  created_at                                 DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at                                 DateTime?       @default(now()) @db.Timestamp(6)
+  abonos                                     abonos[]
+  caja_inicial                               CajaInicial[]
+  envios                                     Envio[]
+  facturas_facturas_recibido_porTousuarios   facturas[]      @relation("facturas_recibido_porTousuarios")
+  facturas_facturas_usuario_subidaTousuarios facturas[]      @relation("facturas_usuario_subidaTousuarios")
+  fiados                                     Fiado[]
+  transferencias                             Transferencia[]
+
+  @@index([email], map: "idx_usuarios_email")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model facturas {
+  id                                         Int       @id @default(autoincrement())
+  pedido_id                                  Int?
+  proveedor_id                               Int
+  tipo_documento                             String    @db.VarChar(50)
+  numero_documento                           String    @db.VarChar(100)
+  fecha_emision                              DateTime  @db.Date
+  monto                                      Decimal   @db.Decimal(10, 2)
+  subida_sistema                             Boolean?  @default(false)
+  fecha_subida                               DateTime? @db.Date
+  usuario_subida                             Int?
+  recibido_por                               Int
+  fecha_recepcion                            DateTime? @default(now()) @db.Timestamp(6)
+  notas                                      String?
+  created_at                                 DateTime? @default(now()) @db.Timestamp(6)
+  pedidos                                    Pedido?   @relation(fields: [pedido_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_factura_pedido")
+  proveedores                                Proveedor @relation(fields: [proveedor_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_factura_proveedor")
+  usuarios_facturas_recibido_porTousuarios   usuarios  @relation("facturas_recibido_porTousuarios", fields: [recibido_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_factura_usuario_recibio")
+  usuarios_facturas_usuario_subidaTousuarios usuarios? @relation("facturas_usuario_subidaTousuarios", fields: [usuario_subida], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_factura_usuario_subio")
+
+  @@index([fecha_emision], map: "idx_facturas_fecha")
+  @@index([numero_documento], map: "idx_facturas_numero")
+  @@index([pedido_id], map: "idx_facturas_pedido")
+  @@index([proveedor_id], map: "idx_facturas_proveedor")
+  @@index([subida_sistema], map: "idx_facturas_subida")
+  @@index([tipo_documento], map: "idx_facturas_tipo")
+}
+
+model abonos {
+  id                Int       @id @default(autoincrement())
+  fecha             DateTime  @db.Date
+  nombre_persona    String    @db.VarChar(200)
+  tipo_persona      String?   @db.VarChar(50)
+  monto             Decimal   @db.Decimal(10, 2)
+  monto_aplicado    Decimal   @default(0) @db.Decimal(10, 2)
+  monto_restante    Decimal   @default(0) @db.Decimal(10, 2)
+  notas             String?
+  registrado_por_id Int?
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+  usuarios          usuarios? @relation(fields: [registrado_por_id], references: [id], onUpdate: NoAction)
+  fiados            Fiado[]
+
+  @@index([fecha], map: "idx_abonos_fecha")
+  @@index([nombre_persona], map: "idx_abonos_nombre_persona")
+}
